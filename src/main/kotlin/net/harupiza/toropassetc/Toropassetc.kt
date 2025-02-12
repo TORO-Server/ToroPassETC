@@ -15,9 +15,10 @@ import prj.salmon.toropassicsystem.TOROpassICsystem
 class Toropassetc : JavaPlugin(), Listener {
     companion object {
         // 可読性の観点からマジックナンバー排除
-        const val TOLLGATE_CLOSE_COOLDOWN: Long = 60
-        const val MAXHEIGHT_OF_ETC: Int = 15
-        const val MAXDISTANCE_OF_ETC: Int = 1
+        const val TOLLGATE_CLOSE_COOLDOWN = 60L
+        const val MAXHEIGHT_OF_ETC = 15
+        const val MAXDISTANCE_OF_ETC = 1
+        const val TOLLTYPE_CONSTANT = """^固定:(\d+)$"""
         val soundBell: Sound = Sound.BLOCK_NOTE_BLOCK_BELL
     }
 
@@ -114,7 +115,7 @@ class Toropassetc : JavaPlugin(), Listener {
                 playerdata.exitStation()
 
                 val line2 = sign.getSide(side).lines[2]
-                if (Regex("""固定:(\d+)""").matches(line2)) {
+                if (Regex(TOLLTYPE_CONSTANT).matches(line2)) {
                     val toll = (line2.split(":")[1].toIntOrNull() ?: return)
                     playGateSound(event.player, playerdata.balance-toll < 0)
                     if (playerdata.balance-toll < 0) {
@@ -157,7 +158,7 @@ class Toropassetc : JavaPlugin(), Listener {
                 }
 
                 val line2 = sign.getSide(side).lines[2]
-                if (Regex("""固定:(\d+)""").matches(line2)) {
+                if (Regex(TOLLTYPE_CONSTANT).matches(line2)) {
                     val toll = (line2.split(":")[1].toIntOrNull() ?: return)
                     playGateSound(event.player, playerdata.balance-toll < 0)
                     if (playerdata.balance-toll < 0) {
