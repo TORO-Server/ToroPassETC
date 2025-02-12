@@ -1,0 +1,5 @@
+name: toropassetc
+version: '1.0'
+main: net.harupiza.toropassetc.Toropassetc
+api-version: '1.20'
+depend: [TOROpassICsystem]
