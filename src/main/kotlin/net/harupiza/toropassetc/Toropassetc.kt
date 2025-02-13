@@ -14,12 +14,17 @@ import prj.salmon.toropassicsystem.TOROpassICsystem
 
 class Toropassetc : JavaPlugin(), Listener {
     companion object {
-        // 可読性の観点からマジックナンバー排除
+        // ゲートが閉まるまでのクールダウンタイム、60ティック=3秒
         const val TOLLGATE_CLOSE_COOLDOWN = 60L
+        // ETC機能看板からのY座標のMAX距離
         const val MAXHEIGHT_OF_ETC = 15
+        // ETC機能看板からのX,Z座標のMAX距離
         const val MAXDISTANCE_OF_ETC = 1
-        const val TOLLTYPE_CONSTANT = """^固定:(\d+)$"""
+        // 通過音
         val soundBell: Sound = Sound.BLOCK_NOTE_BLOCK_BELL
+
+        // 固定料金徴収のETC機能看板の正規表現
+        const val TOLLTYPE_CONSTANT = """^固定:(\d+)$"""
     }
 
     private lateinit var toroPassIcSystem: TOROpassICsystem
@@ -114,17 +119,7 @@ class Toropassetc : JavaPlugin(), Listener {
                 }
                 playerdata.exitStation()
 
-                val line2 = sign.getSide(side).lines[2]
-                if (Regex(TOLLTYPE_CONSTANT).matches(line2)) {
-                    val toll = (line2.split(":")[1].toIntOrNull() ?: return)
-                    playGateSound(event.player, playerdata.balance-toll < 0)
-                    if (playerdata.balance-toll < 0) {
-                        event.player.sendMessage(ChatColor.RED.toString() + "ETCカードが使用できません。")
-                        return
-                    }
-                    playerdata.balance -= toll
-                    event.player.sendMessage(ChatColor.AQUA.toString() + "通過できます。利用料金は${toll}トロポです。")
-                } else return
+                processToll(sign.getSide(side).lines[2], playerdata, event.player)
 
                 sign.getSide(side).setLine(3, "GATE_OPENING")
                 sign.update(true, true)
@@ -157,17 +152,7 @@ class Toropassetc : JavaPlugin(), Listener {
                     return
                 }
 
-                val line2 = sign.getSide(side).lines[2]
-                if (Regex(TOLLTYPE_CONSTANT).matches(line2)) {
-                    val toll = (line2.split(":")[1].toIntOrNull() ?: return)
-                    playGateSound(event.player, playerdata.balance-toll < 0)
-                    if (playerdata.balance-toll < 0) {
-                        event.player.sendMessage(ChatColor.RED.toString() + "ETCカードが使用できません。")
-                        return
-                    }
-                    playerdata.balance -= toll
-                    event.player.sendMessage(ChatColor.AQUA.toString() + "通過できます。利用料金は${toll}トロポです。")
-                } else return
+                processToll(sign.getSide(side).lines[2], playerdata, event.player)
 
                 sign.getSide(side).setLine(3, "GATE_OPENING")
                 sign.update(true, true)
@@ -184,6 +169,22 @@ class Toropassetc : JavaPlugin(), Listener {
         }
     }
 
+    // 料金計算等をする関数
+    private fun processToll(line: String, playerdata: TOROpassICsystem.StationData, player: Player): Boolean {
+        if (Regex(TOLLTYPE_CONSTANT).matches(line)) {
+            val toll = (line.split(":")[1].toIntOrNull() ?: return false)
+            playGateSound(player, playerdata.balance-toll < 0)
+            if (playerdata.balance-toll < 0) {
+                player.sendMessage(ChatColor.RED.toString() + "ETCカードが使用できません。")
+                return true
+            }
+            playerdata.balance -= toll
+            player.sendMessage(ChatColor.AQUA.toString() + "通過できます。利用料金は${toll}トロポです。")
+        }
+        return false
+    }
+
+    // ゲート通過音を鳴らす関数
     private fun playGateSound(player: Player, isError: Boolean = false) {
         if (isError) {
             player.location.world?.playSound(player, soundBell, 5.0f, 1.5f)
