@@ -176,12 +176,12 @@ class Toropassetc : JavaPlugin(), Listener {
             playGateSound(player, playerdata.balance-toll < 0)
             if (playerdata.balance-toll < 0) {
                 player.sendMessage(ChatColor.RED.toString() + "ETCカードが使用できません。")
-                return true
+                return false
             }
             playerdata.balance -= toll
             player.sendMessage(ChatColor.AQUA.toString() + "通過できます。利用料金は${toll}トロポです。")
-        }
-        return false
+            return true
+        } else return false
     }
 
     // ゲート通過音を鳴らす関数
