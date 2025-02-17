@@ -1,5 +1,6 @@
 package net.harupiza.toropassetc
 
+import org.bukkit.Location
 import org.bukkit.Sound
 import org.bukkit.block.Block
 import org.bukkit.block.Sign
@@ -7,9 +8,14 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerMoveEvent
+import org.bukkit.event.vehicle.VehicleEnterEvent
+import org.bukkit.event.vehicle.VehicleExitEvent
 import org.bukkit.event.vehicle.VehicleMoveEvent
 import org.bukkit.plugin.java.JavaPlugin
 import prj.salmon.toropassicsystem.TOROpassICsystem
+import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 class Toropassetc : JavaPlugin(), Listener {
     companion object {
@@ -29,6 +35,10 @@ class Toropassetc : JavaPlugin(), Listener {
 
         lateinit var toroPassIcSystem: TOROpassICsystem
         lateinit var instance: Toropassetc
+
+        var carDistance = HashMap<UUID, Double>()
+        private var lastLoc = HashMap<UUID, Location>()
+        var riderList = ArrayList<UUID>()
     }
 
     override fun onEnable() {
@@ -58,12 +68,16 @@ class Toropassetc : JavaPlugin(), Listener {
             }
         }, 0L, 0L)
     }
-
-    @EventHandler
-    fun onVehicleMove(event: VehicleMoveEvent) {
-    }
-
     @EventHandler
     fun onPlayerMove(event: PlayerMoveEvent) {
+        val uuid = event.player.uniqueId
+
+        if (riderList.contains(uuid)) {
+            if (carDistance[uuid] == null)
+                carDistance[uuid] = 0.0
+
+            carDistance[uuid] = carDistance[uuid]!! + (lastLoc[uuid]?.distance(event.player.location) ?: 0.0)
+            lastLoc[uuid] = event.player.location
+        }
     }
 }
