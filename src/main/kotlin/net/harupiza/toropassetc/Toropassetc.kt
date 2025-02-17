@@ -9,6 +9,7 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerMoveEvent
+import org.bukkit.event.vehicle.VehicleMoveEvent
 import org.bukkit.plugin.java.JavaPlugin
 import prj.salmon.toropassicsystem.TOROpassICsystem
 
@@ -37,13 +38,15 @@ class Toropassetc : JavaPlugin(), Listener {
     }
 
     @EventHandler
-    fun onPlayerMove(event: PlayerMoveEvent) {
+    fun onVehicleMove(event: VehicleMoveEvent) {
+        if (event.vehicle.passengers.isEmpty()) return
+        val player = event.vehicle.passengers[0] as Player
         var block: Block? = null
         var tmpsign: Sign? = null
         for (x in -MAXDISTANCE_OF_ETC..MAXDISTANCE_OF_ETC) {
             for (z in -MAXDISTANCE_OF_ETC..MAXDISTANCE_OF_ETC) {
                 for (y in -MAXHEIGHT_OF_ETC..MAXHEIGHT_OF_ETC) {
-                    val tmpblock = event.player.location.add(x.toDouble(), y.toDouble(), z.toDouble()).block
+                    val tmpblock = player.location.add(x.toDouble(), y.toDouble(), z.toDouble()).block
                     if (tmpblock.state is Sign) {
                         tmpsign = tmpblock.state as Sign
                         block = tmpblock
@@ -53,18 +56,17 @@ class Toropassetc : JavaPlugin(), Listener {
         }
 
         val sign = tmpsign ?: return
-        // Kotlinのココが好き
         val side = if (sign.getSide(Side.FRONT).lines[0] == "[ETC1]") Side.FRONT
-            else if (sign.getSide(Side.BACK).lines[0] == "[ETC1]") Side.BACK
-            else return
-        val uuid = event.player.uniqueId
+        else if (sign.getSide(Side.BACK).lines[0] == "[ETC1]") Side.BACK
+        else return
+        val uuid = player.uniqueId
 
         if (sign.getSide(side).lines[3] == "GATE_OPENING") return
 
         when (sign.getSide(side).lines[1]) {
             "入口", "入口料金所" -> {
                 if (toroPassIcSystem.playerData[uuid]?.isInStation == true) {
-                    event.player.sendMessage(ChatColor.RED.toString() + "既に入場しています。")
+                    player.sendMessage(ChatColor.RED.toString() + "既に入場しています。")
                     sign.getSide(side).setLine(3, "GATE_OPENING")
                     sign.update(true, true)
                     server.scheduler.runTaskLater(this, { ->
@@ -84,8 +86,8 @@ class Toropassetc : JavaPlugin(), Listener {
                         toroPassIcSystem.playerData[uuid]
                     })?.enterStation("ETC1")
 
-                event.player.sendMessage(ChatColor.AQUA.toString() + "通過できます。")
-                playGateSound(event.player)
+                player.sendMessage(ChatColor.AQUA.toString() + "通過できます。")
+                playGateSound(player)
 
                 sign.getSide(side).setLine(3, "GATE_OPENING")
                 sign.update(true, true)
@@ -103,7 +105,7 @@ class Toropassetc : JavaPlugin(), Listener {
                 val playerdata = toroPassIcSystem.playerData[uuid] ?: return
 
                 if (!playerdata.isInStation) {
-                    event.player.sendMessage(ChatColor.RED.toString() + "入場していません。")
+                    player.sendMessage(ChatColor.RED.toString() + "入場していません。")
                     sign.getSide(side).setLine(3, "GATE_OPENING")
                     sign.update(true, true)
                     server.scheduler.runTaskLater(this, { ->
@@ -119,7 +121,7 @@ class Toropassetc : JavaPlugin(), Listener {
                 }
                 playerdata.exitStation()
 
-                processToll(sign.getSide(side).lines[2], playerdata, event.player)
+                processToll(sign.getSide(side).lines[2], playerdata, player)
 
                 sign.getSide(side).setLine(3, "GATE_OPENING")
                 sign.update(true, true)
@@ -137,7 +139,7 @@ class Toropassetc : JavaPlugin(), Listener {
                 val playerdata = toroPassIcSystem.playerData[uuid] ?: return
 
                 if (!playerdata.isInStation) {
-                    event.player.sendMessage(ChatColor.RED.toString() + "入場していません。")
+                    player.sendMessage(ChatColor.RED.toString() + "入場していません。")
                     sign.getSide(side).setLine(3, "GATE_OPENING")
                     sign.update(true, true)
                     server.scheduler.runTaskLater(this, { ->
@@ -152,7 +154,140 @@ class Toropassetc : JavaPlugin(), Listener {
                     return
                 }
 
-                processToll(sign.getSide(side).lines[2], playerdata, event.player)
+                processToll(sign.getSide(side).lines[2], playerdata, player)
+
+                sign.getSide(side).setLine(3, "GATE_OPENING")
+                sign.update(true, true)
+                server.scheduler.runTaskLater(this, { ->
+                    // Blockじゃないと更新できなかったです
+                    if (block != null && block.state is Sign) {
+                        val sign2 = block.state as Sign
+                        sign2.getSide(Side.FRONT).setLine(3, "")
+                        sign2.getSide(Side.BACK).setLine(3, "")
+                        sign2.update(true, true)
+                    }
+                }, TOLLGATE_CLOSE_COOLDOWN)
+            }
+        }
+    }
+
+    @EventHandler
+    fun onPlayerMove(event: PlayerMoveEvent) {
+        val player = event.player
+        var block: Block? = null
+        var tmpsign: Sign? = null
+        for (x in -MAXDISTANCE_OF_ETC..MAXDISTANCE_OF_ETC) {
+            for (z in -MAXDISTANCE_OF_ETC..MAXDISTANCE_OF_ETC) {
+                for (y in -MAXHEIGHT_OF_ETC..MAXHEIGHT_OF_ETC) {
+                    val tmpblock = player.location.add(x.toDouble(), y.toDouble(), z.toDouble()).block
+                    if (tmpblock.state is Sign) {
+                        tmpsign = tmpblock.state as Sign
+                        block = tmpblock
+                    }
+                }
+            }
+        }
+
+        val sign = tmpsign ?: return
+        val side = if (sign.getSide(Side.FRONT).lines[0] == "[ETC1]") Side.FRONT
+            else if (sign.getSide(Side.BACK).lines[0] == "[ETC1]") Side.BACK
+            else return
+        val uuid = player.uniqueId
+
+        if (sign.getSide(side).lines[3] == "GATE_OPENING") return
+
+        when (sign.getSide(side).lines[1]) {
+            "入口", "入口料金所" -> {
+                if (toroPassIcSystem.playerData[uuid]?.isInStation == true) {
+                    player.sendMessage(ChatColor.RED.toString() + "既に入場しています。")
+                    sign.getSide(side).setLine(3, "GATE_OPENING")
+                    sign.update(true, true)
+                    server.scheduler.runTaskLater(this, { ->
+                        // Blockじゃないと更新できなかったです
+                        if (block != null && block.state is Sign) {
+                            val sign2 = block.state as Sign
+                            sign2.getSide(Side.FRONT).setLine(3, "")
+                            sign2.getSide(Side.BACK).setLine(3, "")
+                            sign2.update(true, true)
+                        }
+                    }, TOLLGATE_CLOSE_COOLDOWN)
+                    return
+                }
+                (if (toroPassIcSystem.playerData[uuid] != null) toroPassIcSystem.playerData[uuid] else
+                    run {
+                        toroPassIcSystem.playerData[uuid] = toroPassIcSystem.StationData()
+                        toroPassIcSystem.playerData[uuid]
+                    })?.enterStation("ETC1")
+
+                player.sendMessage(ChatColor.AQUA.toString() + "通過できます。")
+                playGateSound(player)
+
+                sign.getSide(side).setLine(3, "GATE_OPENING")
+                sign.update(true, true)
+                server.scheduler.runTaskLater(this, { ->
+                    // Blockじゃないと更新できなかったです
+                    if (block != null && block.state is Sign) {
+                        val sign2 = block.state as Sign
+                        sign2.getSide(Side.FRONT).setLine(3, "")
+                        sign2.getSide(Side.BACK).setLine(3, "")
+                        sign2.update(true, true)
+                    }
+                }, TOLLGATE_CLOSE_COOLDOWN)
+            }
+            "出口", "出口料金所" -> {
+                val playerdata = toroPassIcSystem.playerData[uuid] ?: return
+
+                if (!playerdata.isInStation) {
+                    player.sendMessage(ChatColor.RED.toString() + "入場していません。")
+                    sign.getSide(side).setLine(3, "GATE_OPENING")
+                    sign.update(true, true)
+                    server.scheduler.runTaskLater(this, { ->
+                        // Blockじゃないと更新できなかったです
+                        if (block != null && block.state is Sign) {
+                            val sign2 = block.state as Sign
+                            sign2.getSide(Side.FRONT).setLine(3, "")
+                            sign2.getSide(Side.BACK).setLine(3, "")
+                            sign2.update(true, true)
+                        }
+                    }, TOLLGATE_CLOSE_COOLDOWN)
+                    return
+                }
+                playerdata.exitStation()
+
+                processToll(sign.getSide(side).lines[2], playerdata, player)
+
+                sign.getSide(side).setLine(3, "GATE_OPENING")
+                sign.update(true, true)
+                server.scheduler.runTaskLater(this, { ->
+                    // Blockじゃないと更新できなかったです
+                    if (block != null && block.state is Sign) {
+                        val sign2 = block.state as Sign
+                        sign2.getSide(Side.FRONT).setLine(3, "")
+                        sign2.getSide(Side.BACK).setLine(3, "")
+                        sign2.update(true, true)
+                    }
+                }, TOLLGATE_CLOSE_COOLDOWN)
+            }
+            "本線", "本線料金所" -> {
+                val playerdata = toroPassIcSystem.playerData[uuid] ?: return
+
+                if (!playerdata.isInStation) {
+                    player.sendMessage(ChatColor.RED.toString() + "入場していません。")
+                    sign.getSide(side).setLine(3, "GATE_OPENING")
+                    sign.update(true, true)
+                    server.scheduler.runTaskLater(this, { ->
+                        // Blockじゃないと更新できなかったです
+                        if (block != null && block.state is Sign) {
+                            val sign2 = block.state as Sign
+                            sign2.getSide(Side.FRONT).setLine(3, "")
+                            sign2.getSide(Side.BACK).setLine(3, "")
+                            sign2.update(true, true)
+                        }
+                    }, TOLLGATE_CLOSE_COOLDOWN)
+                    return
+                }
+
+                processToll(sign.getSide(side).lines[2], playerdata, player)
 
                 sign.getSide(side).setLine(3, "GATE_OPENING")
                 sign.update(true, true)
