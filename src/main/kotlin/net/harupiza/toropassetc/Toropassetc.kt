@@ -1,10 +1,8 @@
 package net.harupiza.toropassetc
 
-import org.bukkit.ChatColor
 import org.bukkit.Sound
 import org.bukkit.block.Block
 import org.bukkit.block.Sign
-import org.bukkit.block.sign.Side
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -28,11 +26,13 @@ class Toropassetc : JavaPlugin(), Listener {
         const val TOLLTYPE_CONSTANT = """^固定:(\d+)$"""
         // 距離換算徴収
         const val TOLLTYPE_DISTANCE = """^距離:(\d+)$"""
+
+        lateinit var toroPassIcSystem: TOROpassICsystem
+        lateinit var instance: Toropassetc
     }
 
-    private lateinit var toroPassIcSystem: TOROpassICsystem
-
     override fun onEnable() {
+        instance = this
         toroPassIcSystem = server.pluginManager.getPlugin("TOROpassICsystem") as TOROpassICsystem
         server.pluginManager.registerEvents(this, this)
 
@@ -54,7 +54,7 @@ class Toropassetc : JavaPlugin(), Listener {
                     }
                 }
 
-                tryToPass(player, block, tmpsign)
+                TollProcessor.tryToPass(this, player, block, tmpsign)
             }
         }, 0L, 0L)
     }
@@ -65,159 +65,5 @@ class Toropassetc : JavaPlugin(), Listener {
 
     @EventHandler
     fun onPlayerMove(event: PlayerMoveEvent) {
-    }
-
-    // 通過処理(共通化)
-    private fun tryToPass(player: Player, block: Block?, tmpsign: Sign?) {
-        val sign = tmpsign ?: return
-        val side = if (sign.getSide(Side.FRONT).lines[0] == "[ETC1]") Side.FRONT
-        else if (sign.getSide(Side.BACK).lines[0] == "[ETC1]") Side.BACK
-        else return
-        val uuid = player.uniqueId
-
-        if (sign.getSide(side).lines[3] == "GATE_OPENING") return
-
-        when (sign.getSide(side).lines[1]) {
-            "入口", "入口料金所" -> {
-                if (toroPassIcSystem.playerData[uuid]?.isInStation == true) {
-                    player.sendMessage(ChatColor.RED.toString() + "既に入場しています。")
-                    sign.getSide(side).setLine(3, "GATE_OPENING")
-                    sign.update(true, true)
-                    server.scheduler.runTaskLater(this, { ->
-                        // Blockじゃないと更新できなかったです
-                        if (block != null && block.state is Sign) {
-                            val sign2 = block.state as Sign
-                            sign2.getSide(Side.FRONT).setLine(3, "")
-                            sign2.getSide(Side.BACK).setLine(3, "")
-                            sign2.update(true, true)
-                        }
-                    }, TOLLGATE_CLOSE_COOLDOWN)
-                    return
-                }
-                (if (toroPassIcSystem.playerData[uuid] != null) toroPassIcSystem.playerData[uuid] else
-                    run {
-                        toroPassIcSystem.playerData[uuid] = toroPassIcSystem.StationData()
-                        toroPassIcSystem.playerData[uuid]
-                    })?.enterStation("ETC1")
-
-                player.sendMessage(ChatColor.AQUA.toString() + "通過できます。")
-                playGateSound(player)
-
-                sign.getSide(side).setLine(3, "GATE_OPENING")
-                sign.update(true, true)
-                server.scheduler.runTaskLater(this, { ->
-                    // Blockじゃないと更新できなかったです
-                    if (block != null && block.state is Sign) {
-                        val sign2 = block.state as Sign
-                        sign2.getSide(Side.FRONT).setLine(3, "")
-                        sign2.getSide(Side.BACK).setLine(3, "")
-                        sign2.update(true, true)
-                    }
-                }, TOLLGATE_CLOSE_COOLDOWN)
-            }
-            "出口", "出口料金所" -> {
-                val playerdata = toroPassIcSystem.playerData[uuid] ?: return
-
-                if (!playerdata.isInStation) {
-                    player.sendMessage(ChatColor.RED.toString() + "入場していません。")
-                    sign.getSide(side).setLine(3, "GATE_OPENING")
-                    sign.update(true, true)
-                    server.scheduler.runTaskLater(this, { ->
-                        // Blockじゃないと更新できなかったです
-                        if (block != null && block.state is Sign) {
-                            val sign2 = block.state as Sign
-                            sign2.getSide(Side.FRONT).setLine(3, "")
-                            sign2.getSide(Side.BACK).setLine(3, "")
-                            sign2.update(true, true)
-                        }
-                    }, TOLLGATE_CLOSE_COOLDOWN)
-                    return
-                }
-                playerdata.exitStation()
-
-                processToll(sign.getSide(side).lines[2], playerdata, player)
-
-                sign.getSide(side).setLine(3, "GATE_OPENING")
-                sign.update(true, true)
-                server.scheduler.runTaskLater(this, { ->
-                    // Blockじゃないと更新できなかったです
-                    if (block != null && block.state is Sign) {
-                        val sign2 = block.state as Sign
-                        sign2.getSide(Side.FRONT).setLine(3, "")
-                        sign2.getSide(Side.BACK).setLine(3, "")
-                        sign2.update(true, true)
-                    }
-                }, TOLLGATE_CLOSE_COOLDOWN)
-            }
-            "本線", "本線料金所" -> {
-                val playerdata = toroPassIcSystem.playerData[uuid] ?: return
-
-                if (!playerdata.isInStation) {
-                    player.sendMessage(ChatColor.RED.toString() + "入場していません。")
-                    sign.getSide(side).setLine(3, "GATE_OPENING")
-                    sign.update(true, true)
-                    server.scheduler.runTaskLater(this, { ->
-                        // Blockじゃないと更新できなかったです
-                        if (block != null && block.state is Sign) {
-                            val sign2 = block.state as Sign
-                            sign2.getSide(Side.FRONT).setLine(3, "")
-                            sign2.getSide(Side.BACK).setLine(3, "")
-                            sign2.update(true, true)
-                        }
-                    }, TOLLGATE_CLOSE_COOLDOWN)
-                    return
-                }
-
-                processToll(sign.getSide(side).lines[2], playerdata, player)
-
-                sign.getSide(side).setLine(3, "GATE_OPENING")
-                sign.update(true, true)
-                server.scheduler.runTaskLater(this, { ->
-                    // Blockじゃないと更新できなかったです
-                    if (block != null && block.state is Sign) {
-                        val sign2 = block.state as Sign
-                        sign2.getSide(Side.FRONT).setLine(3, "")
-                        sign2.getSide(Side.BACK).setLine(3, "")
-                        sign2.update(true, true)
-                    }
-                }, TOLLGATE_CLOSE_COOLDOWN)
-            }
-        }
-    }
-
-    // 料金計算等をする関数
-    private fun processToll(line: String, playerdata: TOROpassICsystem.StationData, player: Player): Boolean {
-        if (Regex(TOLLTYPE_CONSTANT).matches(line)) {
-            val toll = (line.split(":")[1].toIntOrNull() ?: return false)
-            playGateSound(player, playerdata.balance-toll < 0)
-            if (playerdata.balance-toll < 0) {
-                player.sendMessage(ChatColor.RED.toString() + "ETCカードが使用できません。")
-                return false
-            }
-            playerdata.balance -= toll
-            player.sendMessage(ChatColor.AQUA.toString() + "通過できます。利用料金は${toll}トロポです。")
-            return true
-        } else if (Regex(TOLLTYPE_DISTANCE).matches(line)) {return false} else return false
-    }
-
-    // ゲート通過音を鳴らす関数
-    private fun playGateSound(player: Player, isError: Boolean = false) {
-        if (isError) {
-            player.location.world?.playSound(player, soundBell, 5.0f, 1.5f)
-            player.location.world?.playSound(player, soundBell, 5.0f, 2f)
-            server.scheduler.runTaskLater(this, { ->
-                player.location.world?.playSound(player, soundBell, 5.0f, 1.5f)
-                player.location.world?.playSound(player, soundBell, 5.0f, 2f)
-            }, 5)
-            server.scheduler.runTaskLater(this, { ->
-                player.location.world?.playSound(player, soundBell, 5.0f, 1.5f)
-                player.location.world?.playSound(player, soundBell, 5.0f, 2f)
-            }, 10)
-        } else {
-            player.location.world?.playSound(player, soundBell, 5.0f, 1.0f)
-            server.scheduler.runTaskLater(this, { ->
-                player.location.world?.playSound(player, soundBell, 5.0f, 0.5f)
-            }, 5)
-        }
     }
 }
