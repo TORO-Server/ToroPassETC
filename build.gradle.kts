@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "net.harupiza"
-version = "1.2"
+version = "1.2.1"
 
 repositories {
     mavenCentral()
