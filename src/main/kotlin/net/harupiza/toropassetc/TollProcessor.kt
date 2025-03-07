@@ -13,7 +13,6 @@ import org.bukkit.block.Block
 import org.bukkit.block.Sign
 import org.bukkit.block.sign.Side
 import org.bukkit.entity.Player
-import prj.salmon.toropassicsystem.TOROpassICsystem
 
 class TollProcessor {
     companion object {
