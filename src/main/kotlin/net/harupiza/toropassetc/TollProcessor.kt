@@ -6,6 +6,7 @@ import net.harupiza.toropassetc.Toropassetc.Companion.TOLLTYPE_DISTANCE
 import net.harupiza.toropassetc.Toropassetc.Companion.carDistance
 import net.harupiza.toropassetc.Toropassetc.Companion.riderList
 import net.harupiza.toropassetc.Toropassetc.Companion.soundBell
+import net.harupiza.toropassetc.Toropassetc.Companion.toroPassApi
 import net.harupiza.toropassetc.Toropassetc.Companion.toroPassIcSystem
 import org.bukkit.ChatColor
 import org.bukkit.block.Block
@@ -85,7 +86,7 @@ class TollProcessor {
                     }
                     playerdata.exitStation()
 
-                    processToll(sign.getSide(side).lines[2], playerdata, player, plugin)
+                    processToll(sign.getSide(side).lines[2], player, plugin)
                     riderList.remove(player.uniqueId)
 
                     sign.getSide(side).setLine(3, "GATE_OPENING")
@@ -119,7 +120,7 @@ class TollProcessor {
                         return
                     }
 
-                    processToll(sign.getSide(side).lines[2], playerdata, player, plugin)
+                    processToll(sign.getSide(side).lines[2], player, plugin)
                     riderList.remove(player.uniqueId)
 
                     sign.getSide(side).setLine(3, "GATE_OPENING")
@@ -138,7 +139,8 @@ class TollProcessor {
         }
 
         // 料金計算等をする関数
-        private fun processToll(line: String, playerdata: TOROpassICsystem.StationData, player: Player, plugin: Toropassetc): Boolean {
+        private fun processToll(line: String, player: Player, plugin: Toropassetc): Boolean {
+            val balance = toroPassApi.getBalance(player)
             if (Regex(TOLLTYPE_CONSTANT).matches(line)) {
                 val toll = line.split(":")[1].toIntOrNull()
 
@@ -147,12 +149,12 @@ class TollProcessor {
                     return false
                 }
 
-                playGateSound(player, playerdata.balance-toll < 0, plugin)
-                if (playerdata.balance-toll < 0) {
+                playGateSound(player, balance-toll < 0, plugin)
+                if (balance-toll < 0) {
                     player.sendMessage(ChatColor.RED.toString() + "ETCカードが使用できません。")
                     return false
                 }
-                playerdata.balance -= toll
+                toroPassApi.deductBalance(player, toll)
                 player.sendMessage(ChatColor.AQUA.toString() + "通過できます。利用料金は${toll}トロポです。")
                 return true
             } else if (Regex(TOLLTYPE_DISTANCE).matches(line)) {
@@ -165,13 +167,13 @@ class TollProcessor {
                     }
 
                     val res = Math.round(carDistance[player.uniqueId]!! * toll)
-                    playGateSound(player, playerdata.balance-res < 0, plugin)
+                    playGateSound(player, balance-res < 0, plugin)
 
-                    if (playerdata.balance-res < 0) {
+                    if (balance-res < 0) {
                         player.sendMessage(ChatColor.RED.toString() + "ETCカードが使用できません。")
                         return false
                     }
-                    playerdata.balance -= res.toInt()
+                    toroPassApi.deductBalance(player, res.toInt())
                     player.sendMessage(ChatColor.AQUA.toString() + "通過できます。利用料金は${res}トロポです。")
                     return true
                 }

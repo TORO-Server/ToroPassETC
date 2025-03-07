@@ -4,15 +4,12 @@ import org.bukkit.Location
 import org.bukkit.Sound
 import org.bukkit.block.Block
 import org.bukkit.block.Sign
-import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerMoveEvent
-import org.bukkit.event.vehicle.VehicleEnterEvent
-import org.bukkit.event.vehicle.VehicleExitEvent
-import org.bukkit.event.vehicle.VehicleMoveEvent
 import org.bukkit.plugin.java.JavaPlugin
 import prj.salmon.toropassicsystem.TOROpassICsystem
+import prj.salmon.toropassicsystem.TOROpassICsystemAPI
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
@@ -33,6 +30,7 @@ class Toropassetc : JavaPlugin(), Listener {
         // 距離換算徴収
         const val TOLLTYPE_DISTANCE = """^距離:(\d+)$"""
 
+        lateinit var toroPassApi: TOROpassICsystemAPI
         lateinit var toroPassIcSystem: TOROpassICsystem
         lateinit var instance: Toropassetc
 
@@ -44,6 +42,7 @@ class Toropassetc : JavaPlugin(), Listener {
     override fun onEnable() {
         instance = this
         toroPassIcSystem = server.pluginManager.getPlugin("TOROpassICsystem") as TOROpassICsystem
+        toroPassApi = TOROpassICsystemAPI(toroPassIcSystem)
         server.pluginManager.registerEvents(this, this)
 
         logger.info(toroPassIcSystem.name + " has been enabled.")
